@@ -1,0 +1,1388 @@
+--========================================================
+-- Rayfield UI Loader
+--========================================================
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+--========================================================
+-- Services & Player References
+--========================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+
+--========================================================
+-- Window Setup
+--========================================================
+local Window = Rayfield:CreateWindow({
+	Name = "DurDom's Anime Card Collection",
+	LoadingTitle = "DurDom's Anime Card Collection",
+	LoadingSubtitle = "by itzayejay",
+	ShowText = "DurDom",
+	Theme = "Serenity",
+	ToggleUIKeybind = Enum.KeyCode.Insert,
+	ConfigurationSaving = {
+		Enabled = true,
+		FileName = "DurDomHub"
+	},
+	KeySystem = false
+})
+
+--========================================================
+-- PLAYER TAB
+--========================================================
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+PlayerTab:CreateSection("Movement")
+
+local DEFAULT_WALKSPEED = 25
+local speedValue = 25
+local speedEnabled = false
+
+-- Speed Slider
+local SpeedSlider = PlayerTab:CreateSlider({
+	Name = "Speed",
+	Range = {1, 150},
+	Increment = 1,
+	Suffix = "Speed",
+	CurrentValue = speedValue,
+	Flag = "SpeedSlider",
+	Callback = function(Value)
+		speedValue = Value
+	end
+})
+
+-- Speed Toggle
+local SpeedToggle = PlayerTab:CreateToggle({
+	Name = "Enable Speed",
+	CurrentValue = false,
+	Flag = "SpeedToggle",
+	Callback = function(Value)
+		speedEnabled = Value
+		if humanoid then
+			humanoid.WalkSpeed = speedEnabled and speedValue or DEFAULT_WALKSPEED
+		end
+	end
+})
+
+-- Speed Handler
+RunService.RenderStepped:Connect(function()
+	if not speedEnabled then return end
+	if not humanoid or not root then return end
+
+	humanoid.WalkSpeed = speedValue
+	local moveDir = humanoid.MoveDirection
+	if moveDir.Magnitude > 0 then
+		root.AssemblyLinearVelocity =
+			Vector3.new(moveDir.X * speedValue, root.AssemblyLinearVelocity.Y, moveDir.Z * speedValue)
+	end
+end)
+
+-- Respawn Safety
+player.CharacterAdded:Connect(function(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	root = char:WaitForChild("HumanoidRootPart")
+	humanoid.WalkSpeed = DEFAULT_WALKSPEED
+end)
+
+--========================================================
+-- ANTI-AFK TOGGLE
+--========================================================
+local antiAfkEnabled = false
+
+PlayerTab:CreateToggle({
+	Name = "Anti AFK",
+	CurrentValue = false,
+	Flag = "AntiAFK",
+	Callback = function(Value)
+		antiAfkEnabled = Value
+	end
+})
+
+-- Anti-AFK handler
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- Connect Idled event
+player.Idled:Connect(function()
+	if not antiAfkEnabled then return end
+	VirtualUser:CaptureController()
+	VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+	task.wait(0.5)
+	VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+-- Optional tiny nudge every 60s (keeps AFK detection off)
+task.spawn(function()
+	while task.wait(60) do
+		if not antiAfkEnabled then continue end
+		RunService.RenderStepped:Wait()
+	end
+end)
+
+
+--========================================================
+-- GAME TAB
+--========================================================
+local GameTab = Window:CreateTab("Game", 4483362458)
+GameTab:CreateSection("Auto Farms")
+
+--========================================================
+-- GOLD TOKEN FARM
+--========================================================
+local goldFarmEnabled = false
+
+GameTab:CreateToggle({
+	Name = "Gold Token Farm",
+	CurrentValue = false,
+	Flag = "GoldTokenFarm",
+	Callback = function(Value)
+		goldFarmEnabled = Value
+	end
+})
+
+task.spawn(function()
+	while task.wait(0.5) do
+		if not goldFarmEnabled then continue end
+		if not root then continue end
+
+		local tokenFolder = workspace:FindFirstChild("Items")
+			and workspace.Items:FindFirstChild("Tokens")
+			and workspace.Items.Tokens:FindFirstChild("Client")
+
+		if tokenFolder then
+			for _, token in ipairs(tokenFolder:GetChildren()) do
+				if not goldFarmEnabled then break end
+				if token:IsA("BasePart") then
+					root.CFrame = token.CFrame + Vector3.new(0, 2, 0)
+					task.wait(0.15)
+				end
+			end
+		end
+	end
+end)
+
+--========================================================
+-- BOOST FARM
+--========================================================
+local boostFarmEnabled = false
+
+GameTab:CreateToggle({
+	Name = "Boosts Farm",
+	CurrentValue = false,
+	Flag = "BoostFarm",
+	Callback = function(Value)
+		boostFarmEnabled = Value
+	end
+})
+
+local boostPaths = {
+	{"Items","Misc","Collectables","TravelToken1"},
+	{"Items","Misc","Collectables","TravelToken2"},
+	{"Items","Misc","Collectables","HatchTime","Part"},
+	{"Items","Misc","Collectables","Luck","Part"}
+}
+
+task.spawn(function()
+	while task.wait(0.75) do
+		if not boostFarmEnabled then continue end
+		if not root then continue end
+
+		for _, path in ipairs(boostPaths) do
+			if not boostFarmEnabled then break end
+
+			local obj = workspace
+			for _, name in ipairs(path) do
+				obj = obj:FindFirstChild(name)
+				if not obj then break end
+			end
+
+			if obj and obj:IsA("BasePart") and obj.Transparency < 1 then
+				root.CFrame = obj.CFrame + Vector3.new(0, 2, 0)
+				task.wait(0.2)
+			end
+		end
+	end
+end)
+
+--========================================================
+-- TRAVELING MERCHANT
+--========================================================
+local merchantTPEnabled = false
+
+GameTab:CreateToggle({
+	Name = "Auto Traveling Merchant",
+	CurrentValue = false,
+	Flag = "MerchantTP",
+	Callback = function(Value)
+		merchantTPEnabled = Value
+	end
+})
+
+task.spawn(function()
+	while task.wait(1) do
+		if not merchantTPEnabled then continue end
+		if not root then continue end
+
+		local merchant = workspace:FindFirstChild("Items")
+			and workspace.Items:FindFirstChild("Merchant")
+			and workspace.Items.Merchant:FindFirstChild("Client")
+			and workspace.Items.Merchant.Client:FindFirstChild("MerchantStand")
+
+		if merchant and merchant:IsA("Model") then
+			local part = merchant:FindFirstChildWhichIsA("BasePart")
+			if part then
+				root.CFrame = part.CFrame + Vector3.new(0, 2, 0)
+			end
+		end
+	end
+end)
+
+
+
+--========================================================
+-- AUTO FARMING & MUTATION FILTERS (FULL INTEGRATION)
+--========================================================
+
+-- Create Auto Farming Tab
+local AutoFarmTab = Window:CreateTab("Auto Farming", 4483362458)
+AutoFarmTab:CreateSection("Pack Automation")
+
+-- Create Mutation Filters Tab
+local MutationTab = Window:CreateTab("Mutation Filters", 4483362458)
+MutationTab:CreateSection("Allowed Mutations")
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card")
+
+--========================================================
+-- STATE VARIABLES
+--========================================================
+local autoFarmPacksEnabled = false
+local selectedPacks = {}
+local mutationFilters = {
+    Gold = false,
+    Emerald = false,
+    Void = false,
+    Diamond = false,
+    Rainbow = false
+}
+
+--========================================================
+-- MUTATION FILTER TOGGLES
+--========================================================
+for mutation, _ in pairs(mutationFilters) do
+    MutationTab:CreateToggle({
+        Name = mutation,
+        CurrentValue = false,
+        Flag = "Mutation_" .. mutation,
+        Callback = function(v)
+            mutationFilters[mutation] = v
+            print("[MutationTab] " .. mutation .. " set to", v)
+        end
+    })
+end
+
+-- Restore saved mutation flags
+task.delay(1, function()
+    for mutation, _ in pairs(mutationFilters) do
+        local flag = Rayfield.Flags["Mutation_" .. mutation]
+        if flag and flag.CurrentValue ~= nil then
+            mutationFilters[mutation] = flag.CurrentValue
+            print("[MutationTab] Restored", mutation, flag.CurrentValue)
+        end
+    end
+end)
+
+--========================================================
+-- AUTO FARM TOGGLE
+--========================================================
+AutoFarmTab:CreateToggle({
+    Name = "Auto Farm Packs",
+    CurrentValue = false,
+    Flag = "AutoFarmPacks",
+    Callback = function(v)
+        autoFarmPacksEnabled = v
+    end
+})
+
+-- Restore auto farm toggle on load
+task.delay(1, function()
+    local flag = Rayfield.Flags["AutoFarmPacks"]
+    if flag and flag.CurrentValue ~= nil then
+        autoFarmPacksEnabled = flag.CurrentValue
+        print("[AutoFarm] Restored Auto Farm:", autoFarmPacksEnabled)
+    end
+end)
+
+--========================================================
+-- PACK FILTER TOGGLES
+--========================================================
+local packsFolder =
+    ReplicatedStorage:FindFirstChild("Assets")
+    and ReplicatedStorage.Assets:FindFirstChild("Packs")
+
+if packsFolder then
+    for _, pack in ipairs(packsFolder:GetChildren()) do
+        if pack:IsA("Model") then
+            selectedPacks[pack.Name] = false
+
+            AutoFarmTab:CreateToggle({
+                Name = pack.Name,
+                CurrentValue = false,
+                Flag = "Pack_" .. pack.Name,
+                Callback = function(v)
+                    selectedPacks[pack.Name] = v
+                    print("[AutoFarm] Pack " .. pack.Name .. " set to", v)
+                end
+            })
+        end
+    end
+end
+
+-- Restore pack toggles
+task.delay(1, function()
+    for packName, _ in pairs(selectedPacks) do
+        local flag = Rayfield.Flags["Pack_" .. packName]
+        if flag and flag.CurrentValue ~= nil then
+            selectedPacks[packName] = flag.CurrentValue
+            print("[AutoFarm] Restored pack:", packName, flag.CurrentValue)
+        end
+    end
+end)
+
+--========================================================
+-- MUTATION CHECK FUNCTION
+--========================================================
+local function mutationPasses(packModel)
+    -- If no mutation toggles are ON → allow all
+    local anyEnabled = false
+    for _, enabled in pairs(mutationFilters) do
+        if enabled then
+            anyEnabled = true
+            break
+        end
+    end
+    if not anyEnabled then
+        return true
+    end
+
+    -- Loop through all categories under the pack
+    for _, category in ipairs(packModel:GetChildren()) do
+        -- category is something like "Hunter"
+        for _, mutation in ipairs(category:GetChildren()) do
+            if mutationFilters[mutation.Name] then
+                return true -- allowed mutation found
+            end
+        end
+    end
+
+    -- No allowed mutations found
+    return false
+end
+
+
+--========================================================
+-- FIND PLAYER PLOT
+--========================================================
+local function getPlayerPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+
+    for i = 1, 6 do
+        local plot = plots:FindFirstChild(tostring(i))
+        if plot then
+            local display =
+                plot:FindFirstChild("Map")
+                and plot.Map:FindFirstChild("Display")
+                and plot.Map.Display:FindFirstChild("Top")
+                and plot.Map.Display.Top:FindFirstChild("Gui")
+                and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+                and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+            if display and typeof(display.Text) == "string" then
+                local textLower = string.lower(display.Text)
+                local playerLower = string.lower(player.Name)
+                if string.find(textLower, playerLower, 1, true) then
+                    print("[AutoFarm] Detected player plot:", i, "Text:", display.Text)
+                    return i
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+task.spawn(function()
+	local cachedPlot = nil
+	local lastPlotCheck = 0
+
+	while task.wait(1) do
+		if not autoFarmPacksEnabled then
+			cachedPlot = nil
+			continue
+		end
+
+		-- Recheck plot every 2 seconds
+		if not cachedPlot or tick() - lastPlotCheck > 2 then
+			cachedPlot = getPlayerPlot()
+			lastPlotCheck = tick()
+		end
+
+		if not cachedPlot then
+			continue
+		end
+
+		local packsInWorkspace = workspace:FindFirstChild("Client")
+			and workspace.Client:FindFirstChild("Packs")
+
+		if not packsInWorkspace then
+			continue
+		end
+
+		local foundOwnedPack = false
+		for _, packModel in ipairs(packsInWorkspace:GetChildren()) do
+			if packModel.Name:sub(-2) == "-" .. tostring(cachedPlot) then
+				foundOwnedPack = true
+				break
+			end
+		end
+
+		if not foundOwnedPack then
+			continue
+		end
+
+		for packName, isEnabled in pairs(selectedPacks) do
+			if not autoFarmPacksEnabled then break end
+			if not isEnabled then continue end
+
+			for _, packModel in ipairs(packsInWorkspace:GetChildren()) do
+				if packModel.Name:sub(-2) == "-" .. tostring(cachedPlot) then
+					if packModel:FindFirstChild(packName) and mutationPasses(packModel) then
+						CardRemote:FireServer("BuyPack", packModel.Name)
+						task.wait(0.2)
+					end
+				end
+			end
+		end
+	end
+end)
+
+
+
+
+--========================================================
+-- AUTO GRADING TAB (FIXED DROPDOWN CALLBACK)
+--========================================================
+local AutoGradeTab = Window:CreateTab("Auto Grading", 4483362458)
+AutoGradeTab:CreateSection("Card Grading Automation")
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GradeRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Grade")
+
+-- State
+local autoGradeEnabled = false
+local selectedCharacter = nil
+local lastDropdownSelection = nil
+local GRADE_DELAY = 0.05
+
+-- Character data
+local CharacterCategories = {
+	["One Piece"] = {"Luffy","Nami","Chopper","Usopp","Nico Robin","Franky","Jimbei","Sanji","Zoro"},
+	["Naruto"] = {"Naruto","Sakura","Shikamaru","Hinato","Rock Lee","Gaara","Sasuke","Kakashi","Minato"},
+	["Bleach"] = {"Ichigo","Kon","Orihime","Chad","Ury","Rukia","Renji","Kenpachi","Urahara"},
+	["Demon Slayer"] = {"Tanjiro","Nezuko","Inosuke","Zenitsu","Rengoku","Mitsuri","Giyu","Obanai","Sanemi"},
+	["Jujutsu Kaisen"] = {"Itadori","Nobara","Megumi","Toge","Maki","Todo","Yuta","Gojo","Sukuna"},
+	["Dragon Ball"] = {"Goku","Vegeta","Krillin","Piccolo","Trunks","Gohan","Super Saiyan Rose","Broly","Beerus"},
+	["Fire Force"] = {"Shinra","Iris","Tamaki","Obi","Hibana","Arthur","Sho","Benimaru"},
+	["One Punch Man"] = {"Saitama","King","Fubuki","Sonic","Child Emperor","Genos","Bang","Kamikaze","Tatsumaki"},
+	["Hunter x Hunter"] = {"Gon","Leorio","Shizuku","Kurapike","Kite","Killua","Hisoka","Neferpitou","Netero"},
+	["Solo Leveling"] = {"Jinwoo","Chae In","Tank","Yoonho","Jong In","Tusk","Gunhee","Beru","Igris"},
+	["Attack on Titan"] = {"Eren","Sasha","Armin","Reiner","Annie","Hange","Mikasa","Levi","Historia"},
+	["Chainsaw Man"] = {"Denji","Kobeni","Himeno","Aki","Power","Galgali","Angel","Reze","Makima"},
+	["Haikyuu"] = {"Kageyama","Nishinoya","Aone","Kuroo","Bokuto","Miya Twins","Oikawa","Ushijima"},
+	["Blue Lock"] = {"Isagi","Bachira","Chigiri","Kunigami","Nagi","Barou","Shidou","Rin","Sae"},
+	["Black Clover"] = {"Asta","Yuno","Noelle","Luck","William","Nacht","Mereoleona","Yami","Julius"},
+	["Tokyo Ghoul"] = {"Kaneki","Kirishima","Fueguchi","Tsukiyama","Arima","Amon","Rize","Eto","Arima"},
+	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazaku", "VV"},
+	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jonathan"}
+}
+
+
+-- Category display order
+local CategoryOrder = {
+	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
+	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
+	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre"
+}
+
+-- Auto Grade toggle
+AutoGradeTab:CreateToggle({
+	Name = "Auto Grade",
+	CurrentValue = false,
+	Flag = "AutoGradeToggle",
+	Callback = function(Value)
+		autoGradeEnabled = Value
+		-- Refresh selected character when toggling on
+		if Value and lastDropdownSelection then
+			selectedCharacter = lastDropdownSelection
+		end
+	end
+})
+
+-- Dropdowns (fixed to always update selectedCharacter)
+for _, categoryName in ipairs(CategoryOrder) do
+	local characterList = CharacterCategories[categoryName]
+	if not characterList then continue end
+
+	AutoGradeTab:CreateDropdown({
+		Name = categoryName,
+		Options = characterList,
+		CurrentOption = nil,
+		Flag = "AutoGrade_" .. categoryName,
+		Callback = function(Option)
+			-- Force selection even if same value is reselected
+			if typeof(Option) == "table" then
+				selectedCharacter = Option[1]
+			else
+				selectedCharacter = Option
+			end
+			lastDropdownSelection = selectedCharacter
+		end
+	})
+end
+
+-- Auto Grade loop (fires correctly every tick)
+task.spawn(function()
+	while task.wait(GRADE_DELAY) do
+		if not autoGradeEnabled then continue end
+		if not selectedCharacter then continue end
+		if typeof(selectedCharacter) ~= "string" then continue end
+
+		local args = {"Roll", selectedCharacter}
+		GradeRemote:FireServer(unpack(args))
+	end
+end)
+
+
+--========================================================
+-- AUTO TRAITS TAB (NEW)
+--========================================================
+local AutoTraitsTab = Window:CreateTab("Auto Traits", 4483362458)
+AutoTraitsTab:CreateSection("Trait Rolling")
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TowerRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Tower")
+
+-- State
+local autoFarmTraitsEnabled = false
+local selectedTraitCharacter = nil
+local lastTraitSelection = nil
+
+-- Roll speed (~13 rolls/sec)
+local TRAIT_ROLL_DELAY = 0.075
+
+--========================================================
+-- AUTO FARM TRAITS TOGGLE
+--========================================================
+AutoTraitsTab:CreateToggle({
+	Name = "AutoFarm Traits",
+	CurrentValue = false,
+	Flag = "AutoFarmTraits",
+	Callback = function(v)
+		autoFarmTraitsEnabled = v
+		-- Restore last selected character when toggled on
+		if v and lastTraitSelection then
+			selectedTraitCharacter = lastTraitSelection
+		end
+	end
+})
+
+--========================================================
+-- ANIME → CHARACTER LISTS (ORDER PRESERVED)
+--========================================================
+local TraitCategories = {
+	["One Piece"] = {"Luffy","Nami","Chopper","Usopp","Nico Robin","Franky","Jimbei","Sanji","Zoro"},
+	["Naruto"] = {"Naruto","Sakura","Shikamaru","Hinato","Rock Lee","Gaara","Sasuke","Kakashi","Minato"},
+	["Bleach"] = {"Ichigo","Kon","Orihime","Chad","Ury","Rukia","Renji","Kenpachi","Urahara"},
+	["Demon Slayer"] = {"Tanjiro","Nezuko","Inosuke","Zenitsu","Rengoku","Mitsuri","Giyu","Obanai","Sanemi"},
+	["Jujutsu Kaisen"] = {"Itadori","Nobara","Megumi","Toge","Maki","Todo","Yuta","Gojo","Sukuna"},
+	["Dragon Ball"] = {"Goku","Vegeta","Krillin","Piccolo","Trunks","Gohan","Super Saiyan Rose","Broly","Beerus"},
+	["Fire Force"] = {"Shinra","Iris","Tamaki","Obi","Hibana","Arthur","Sho","Benimaru"},
+	["One Punch Man"] = {"Saitama","King","Fubuki","Sonic","Child Emperor","Genos","Bang","Kamikaze","Tatsumaki"},
+	["Hunter x Hunter"] = {"Gon","Leorio","Shizuku","Kurapike","Kite","Killua","Hisoka","Neferpitou","Netero"},
+	["Solo Leveling"] = {"Jinwoo","Chae In","Tank","Yoonho","Jong In","Tusk","Gunhee","Beru","Igris"},
+	["Attack on Titan"] = {"Eren","Sasha","Armin","Reiner","Annie","Hange","Mikasa","Levi","Historia"},
+	["Chainsaw Man"] = {"Denji","Kobeni","Himeno","Aki","Power","Galgali","Angel","Reze","Makima"},
+	["Haikyuu"] = {"Kageyama","Nishinoya","Aone","Kuroo","Bokuto","Miya Twins","Oikawa","Ushijima"},
+	["Blue Lock"] = {"Isagi","Bachira","Chigiri","Kunigami","Nagi","Barou","Shidou","Rin","Sae"},
+	["Black Clover"] = {"Asta","Yuno","Noelle","Luck","William","Nacht","Mereoleona","Yami","Julius"},
+	["Tokyo Ghoul"] = {"Kaneki","Kirishima","Fueguchi","Tsukiyama","Arima","Amon","Rize","Eto","Arima"},
+	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazuka", "VV"},
+	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jotaro"}
+}
+
+-- Explicit display order
+local TraitCategoryOrder = {
+	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
+	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
+	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre"
+}
+
+--========================================================
+-- DROPDOWNS (MOST RECENT SELECTION WINS)
+--========================================================
+for _, categoryName in ipairs(TraitCategoryOrder) do
+	local characterList = TraitCategories[categoryName]
+	if not characterList then continue end
+
+	AutoTraitsTab:CreateDropdown({
+		Name = categoryName,
+		Options = characterList,
+		CurrentOption = nil,
+		Flag = "Trait_" .. categoryName,
+		Callback = function(option)
+			-- Rayfield sometimes returns table
+			if typeof(option) == "table" then
+				selectedTraitCharacter = option[1]
+			else
+				selectedTraitCharacter = option
+			end
+
+			lastTraitSelection = selectedTraitCharacter
+			print("[Traits] Selected:", selectedTraitCharacter)
+		end
+	})
+end
+
+--========================================================
+-- AUTO TRAIT ROLL LOOP (FAST)
+--========================================================
+task.spawn(function()
+	while task.wait(TRAIT_ROLL_DELAY) do
+		if not autoFarmTraitsEnabled then continue end
+		if not selectedTraitCharacter then continue end
+		if typeof(selectedTraitCharacter) ~= "string" then continue end
+
+		TowerRemote:FireServer("Roll", selectedTraitCharacter)
+	end
+end)
+
+--========================================================
+-- AUTO PLACE PACKS TAB
+--========================================================
+local AutoPlaceTab = Window:CreateTab("Auto Place Packs", 4483362458)
+AutoPlaceTab:CreateSection("Pack Placement")
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card")
+local PotionRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Potion")
+
+--========================================================
+-- PLACE POSITIONS (ORDER MATTERS)
+--========================================================
+local PLACE_POSITIONS = {
+	Vector3.new(-452, 7, -359),
+	Vector3.new(-453, 7, -347),
+	Vector3.new(-451, 7, -335),
+	Vector3.new(-452, 7, -323),
+	Vector3.new(-451, 7, -309),
+	Vector3.new(-462, 7, -304),
+	Vector3.new(-469, 7, -292),
+	Vector3.new(-483, 7, -291),
+	Vector3.new(-476, 7, -302),
+	Vector3.new(-466, 7, -314),
+	Vector3.new(-464, 7, -326),
+	Vector3.new(-465, 7, -338),
+	Vector3.new(-467, 7, -349),
+	Vector3.new(-467, 7, -361),
+	Vector3.new(-481, 7, -361),
+	Vector3.new(-481, 7, -349),
+	Vector3.new(-480, 7, -335),
+	Vector3.new(-480, 7, -323),
+	Vector3.new(-482, 7, -311),
+	Vector3.new(-492, 7, -300),
+	Vector3.new(-495, 7, -311),
+	Vector3.new(-495, 7, -322),
+	Vector3.new(-493, 7, -333),
+	Vector3.new(-494, 7, -345),
+	Vector3.new(-494, 7, -358),
+	Vector3.new(-506, 7, -350),
+	Vector3.new(-508, 7, -331),
+	Vector3.new(-508, 7, -320),
+	Vector3.new(-494, 7, -288),
+	Vector3.new(-504, 7, -363),
+	Vector3.new(-504, 7, -343),
+	Vector3.new(-503, 7, -300),
+	Vector3.new(-459, 7, -296)
+}
+
+
+--========================================================
+-- GET EQUIPPED PACK NAME
+--========================================================
+local function getEquippedPack()
+	local charFolder = workspace:FindFirstChild("Players")
+		and workspace.Players:FindFirstChild(player.Name)
+
+	if not charFolder then return nil end
+
+	local hrp = charFolder:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+
+	for _, obj in ipairs(hrp:GetChildren()) do
+		if obj:IsA("Model") then
+			return obj.Name
+		end
+	end
+
+	return nil
+end
+
+--========================================================
+-- AUTO PLACE BUTTON
+--========================================================
+
+
+
+AutoPlaceTab:CreateButton({
+	Name = "Auto Place Equipped Pack",
+	Callback = function()
+		local character = player.Character or player.CharacterAdded:Wait()
+		local root = character:WaitForChild("HumanoidRootPart")
+
+		local packName = getEquippedPack()
+		if not packName then
+			Rayfield:Notify({
+				Title = "Auto Place",
+				Content = "No pack equipped.",
+				Duration = 4
+			})
+			return
+		end
+
+		for _, pos in ipairs(PLACE_POSITIONS) do
+			-- Move first (required)
+			root.CFrame = CFrame.new(pos)
+			task.wait(0.12)
+
+			-- Place pack
+			CardRemote:FireServer("Place", packName)
+			task.wait(0.12)
+		end
+
+		Rayfield:Notify({
+			Title = "Auto Place",
+			Content = "Finished placing packs.",
+			Duration = 4
+		})
+	end
+})
+
+--========================================================
+-- AUTO 2-MINUTE SPEEDUP (KEYBIND)
+--========================================================
+local autoSpeedupEnabled = false
+
+AutoPlaceTab:CreateKeybind({
+	Name = "Auto 2-Minute Speedup",
+	CurrentKeybind = "M",
+	HoldToInteract = false,
+	Flag = "AutoSpeedupKeybind",
+	Callback = function()
+		autoSpeedupEnabled = not autoSpeedupEnabled
+
+		Rayfield:Notify({
+			Title = "Auto Speedup",
+			Content = autoSpeedupEnabled and "Enabled" or "Disabled",
+			Duration = 2
+		})
+	end
+})
+
+task.spawn(function()
+	while task.wait(0.05) do
+		if not autoSpeedupEnabled then continue end
+		PotionRemote:FireServer("Apply", "HatchTime1")
+	end
+end)
+
+--========================================================
+-- AUTO OPEN PACKS
+--========================================================
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local autoOpenEnabled = false
+
+AutoPlaceTab:CreateToggle({
+	Name = "Auto Open Packs",
+	CurrentValue = false,
+	Flag = "AutoOpenPacks",
+	Callback = function(v)
+		autoOpenEnabled = v
+	end
+})
+
+--========================================================
+-- FIND PLAYER PLOT (REUSED LOGIC)
+--========================================================
+local function getPlayerPlot()
+	local plots = workspace:FindFirstChild("Plots")
+	if not plots then return nil end
+
+	for i = 1, 6 do
+		local plot = plots:FindFirstChild(tostring(i))
+		if plot then
+			local display =
+				plot:FindFirstChild("Map")
+				and plot.Map:FindFirstChild("Display")
+				and plot.Map.Display:FindFirstChild("Top")
+				and plot.Map.Display.Top:FindFirstChild("Gui")
+				and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+				and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+			if display and typeof(display.Text) == "string" then
+				if string.find(string.lower(display.Text), string.lower(player.Name), 1, true) then
+					return i
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+--========================================================
+-- AUTO OPEN LOOP
+--========================================================
+task.spawn(function()
+	while task.wait(0.4) do
+		if not autoOpenEnabled then continue end
+
+		local plotIndex = getPlayerPlot()
+		if not plotIndex then continue end
+
+		local plot = workspace.Plots:FindFirstChild(tostring(plotIndex))
+		if not plot then continue end
+
+		local packsFolder = plot:FindFirstChild("Packs")
+		if not packsFolder then continue end
+
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then continue end
+
+		for _, packModel in ipairs(packsFolder:GetChildren()) do
+			if not autoOpenEnabled then break end
+			if not packModel:IsA("Model") then continue end
+
+			local part = packModel:FindFirstChildWhichIsA("BasePart")
+			if not part then continue end
+
+			-- Move to pack
+			root.CFrame = part.CFrame + Vector3.new(0, 2, 0)
+			task.wait(0.15)
+
+			-- Find ProximityPrompt
+			local prompt = packModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+			if prompt then
+				-- Fire prompt directly (cleanest + fastest)
+				pcall(function()
+					fireproximityprompt(prompt)
+				end)
+			end
+
+			task.wait(0.2)
+		end
+	end
+end)
+
+
+
+--========================================================
+-- MISC TAB
+--========================================================
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+MiscTab:CreateSection("Anti AFK Patrol")
+
+local antiAfkPatrolEnabled = false
+
+MiscTab:CreateToggle({
+	Name = "Anti AFK Patrol Walk",
+	CurrentValue = false,
+	Flag = "AntiAfkPatrolWalk",
+	Callback = function(Value)
+		antiAfkPatrolEnabled = Value
+	end
+})
+
+-- Patrol points
+local PATROL_POINTS = {
+	Vector3.new(-535, 8, -398),
+	Vector3.new(-535, 8, -228),
+	Vector3.new(-534, 8, -49),
+	Vector3.new(-470, 8, -12)
+}
+
+local STRAY_DISTANCE = 35
+
+local function getClosestPointIndex(pos)
+	local closestIndex = 1
+	local closestDistance = math.huge
+
+	for i, point in ipairs(PATROL_POINTS) do
+		local dist = (pos - point).Magnitude
+		if dist < closestDistance then
+			closestDistance = dist
+			closestIndex = i
+		end
+	end
+
+	return closestIndex
+end
+
+--========================================================
+-- ANTI-AFK PATROL LOOP (FINAL LOGIC)
+--========================================================
+task.spawn(function()
+	local index = 1
+	local direction = 1
+	local initialized = false
+
+	while task.wait(0.25) do
+		if not antiAfkPatrolEnabled then
+			initialized = false
+			continue
+		end
+
+		if not humanoid or not root then
+			continue
+		end
+
+		-- First enable: snap to closest point
+		if not initialized then
+			index = getClosestPointIndex(root.Position)
+			initialized = true
+		end
+
+		local target = PATROL_POINTS[index]
+
+		-- Walk to target
+		humanoid:MoveTo(target)
+
+		-- Wait until close OR timeout
+		local timeout = tick() + 6
+		while tick() < timeout do
+			if not antiAfkPatrolEnabled then break end
+			if (root.Position - target).Magnitude <= 3 then
+				break
+			end
+			task.wait(0.1)
+		end
+
+		-- === ALWAYS ADVANCE TO NEXT POINT ===
+		index += direction
+
+		-- Reverse at ends (ping-pong patrol)
+		if index > #PATROL_POINTS then
+			index = #PATROL_POINTS - 1
+			direction = -1
+		elseif index < 1 then
+			index = 2
+			direction = 1
+		end
+	end
+end)
+
+-- SERVER HOPPING
+local merchantHopEnabled = false
+local hopping = false
+
+MiscTab:CreateToggle({
+	Name = "Server Hop Until Merchant",
+	CurrentValue = false,
+	Flag = "MerchantServerHop",
+	Callback = function(Value)
+		merchantHopEnabled = Value
+	end
+})
+
+local PLACE_ID = 76285745979410
+local visitedServers = {}
+
+local function merchantExists()
+	local folder =
+		workspace:FindFirstChild("Items")
+		and workspace.Items:FindFirstChild("Merchant")
+		and workspace.Items.Merchant:FindFirstChild("Client")
+
+	return folder and #folder:GetChildren() > 0
+end
+
+local function hopServer()
+	if hopping then return end
+	hopping = true
+
+	local success, response = pcall(function()
+		return HttpService:JSONDecode(
+			game:HttpGet(
+				"https://games.roblox.com/v1/games/" .. PLACE_ID .. "/servers/Public?sortOrder=Asc&limit=100"
+			)
+		)
+	end)
+
+	if success and response and response.data then
+		for _, server in ipairs(response.data) do
+			if server.playing < server.maxPlayers and not visitedServers[server.id] then
+				visitedServers[server.id] = true
+				TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, player)
+				return
+			end
+		end
+	end
+
+	hopping = false
+end
+
+--========================================================
+-- SERVER HOP LOOP
+--========================================================
+task.spawn(function()
+	while task.wait(5) do
+		if not merchantHopEnabled then
+			hopping = false
+			continue
+		end
+
+		if merchantExists() then
+			-- Merchant found, stay in server
+			hopping = false
+			continue
+		end
+
+		-- Merchant not found → hop
+		hopServer()
+	end
+end)
+
+--========================================================
+-- MISC TAB (SERVER HOP ONCE)
+--========================================================
+
+-- Reuse window safely
+
+
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local PLACE_ID = game.PlaceId
+
+local function hopServerOnce()
+	local servers = {}
+	local cursor = nil
+
+	repeat
+		local url =
+			"https://games.roblox.com/v1/games/" .. PLACE_ID ..
+			"/servers/Public?sortOrder=Asc&limit=100" ..
+			(cursor and "&cursor=" .. cursor or "")
+
+		local success, response = pcall(function()
+			return game:HttpGet(url)
+		end)
+
+		if not success then break end
+
+		local data = HttpService:JSONDecode(response)
+
+		for _, server in ipairs(data.data or {}) do
+			if server.id ~= game.JobId and server.playing < server.maxPlayers then
+				table.insert(servers, server.id)
+			end
+		end
+
+		cursor = data.nextPageCursor
+	until cursor == nil or #servers > 0
+
+	if #servers > 0 then
+		TeleportService:TeleportToPlaceInstance(
+			PLACE_ID,
+			servers[math.random(#servers)],
+			player
+		)
+	else
+		Rayfield:Notify({
+			Title = "Server Hop",
+			Content = "No available servers found.",
+			Duration = 4
+		})
+	end
+end
+
+MiscTab:CreateButton({
+	Name = "Hop Server Once",
+	Callback = function()
+		hopServerOnce()
+	end
+})
+
+--========================================================
+-- INFINITE YIELD BUTTON
+--========================================================
+
+MiscTab:CreateButton({
+	Name = "Infinite Yield",
+	Callback = function()
+		loadstring(game:HttpGet(
+			"https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"
+		))()
+	end
+})
+
+--========================================================
+-- WEATHER EVENT SERVER HOP
+--========================================================
+
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local weatherHopEnabled = false
+local weatherHopCooldown = false
+
+MiscTab:CreateToggle({
+	Name = "Weather Event Server Hop",
+	CurrentValue = false,
+	Flag = "WeatherEventHop",
+	Callback = function(Value)
+		weatherHopEnabled = Value
+	end
+})
+
+-- Simple server hop (new server, same place)
+local function hopServer()
+	if weatherHopCooldown then return end
+	weatherHopCooldown = true
+
+	task.delay(5, function()
+		weatherHopCooldown = false
+	end)
+
+	TeleportService:Teleport(game.PlaceId, player)
+end
+
+-- Weather check loop
+task.spawn(function()
+	while task.wait(3) do
+		if not weatherHopEnabled then
+			continue
+		end
+
+		local weatherFolder = workspace:FindFirstChild("VFX")
+			and workspace.VFX:FindFirstChild("Weather")
+
+		-- No weather folder → hop
+		if not weatherFolder then
+			hopServer()
+			continue
+		end
+
+		local children = weatherFolder:GetChildren()
+
+		-- Empty folder → hop
+		if #children == 0 then
+			hopServer()
+			continue
+		end
+
+		-- Only Rain present → hop
+		if #children == 1 and children[1].Name == "Rain" then
+			hopServer()
+			continue
+		end
+
+		-- Any other weather → stay
+	end
+end)
+
+local towerRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Tower")
+
+-- Start Tower Button
+MiscTab:CreateButton({
+	Name = "Start Tower",
+	Callback = function()
+		pcall(function()
+			towerRemote:FireServer("StartTower")
+		end)
+	end
+})
+
+--========================================================
+-- STREAMSAVER TAB
+--========================================================
+--[[
+local StreamSaverTab = Window:CreateTab("StreamSaver", 4483362458)
+StreamSaverTab:CreateSection("Display Tools")
+
+StreamSaverTab:CreateButton({
+	Name = "Set All Plots Display Text",
+	Callback = function()
+		local plotsFolder = workspace:FindFirstChild("Plots")
+		if not plotsFolder then
+			warn("[StreamSaver] Plots folder not found")
+			return
+		end
+
+		for i = 1, 6 do
+			local plot = plotsFolder:FindFirstChild(tostring(i))
+			if plot then
+				local display =
+					plot:FindFirstChild("Map")
+					and plot.Map:FindFirstChild("Display")
+					and plot.Map.Display:FindFirstChild("Top")
+					and plot.Map.Display.Top:FindFirstChild("Gui")
+					and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+					and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+				if display and (display:IsA("TextLabel") or display:IsA("TextBox")) then
+					display.Text = "DurDomHub's Collection"
+				else
+					warn("[StreamSaver] Display not found for plot " .. i)
+				end
+			else
+				warn("[StreamSaver] Plot " .. i .. " not found")
+			end
+		end
+	end
+})
+]]
+
+
+--========================================================
+-- AUTO FARM POTIONS TAB
+--========================================================
+local AutoFarmPotionsTab = Window:CreateTab("AutoFarm Potions", 4483362458)
+AutoFarmPotionsTab:CreateSection("Potion & Downgrade Automation")
+
+--========================================================
+-- AUTO DOWNGRADE (PIRATE GOLD)
+--========================================================
+local autoDowngradeEnabled = false
+
+AutoFarmPotionsTab:CreateToggle({
+	Name = "Auto Downgrade Pirate Gold",
+	CurrentValue = false,
+	Flag = "AutoDowngradePirateGold",
+	Callback = function(v)
+		autoDowngradeEnabled = v
+	end
+})
+
+task.spawn(function()
+	while true do
+		if autoDowngradeEnabled then
+			CardRemote:FireServer("Downgrade", "Pirate", "Gold")
+			task.wait() -- minimal yield, fastest safe speed
+		else
+			task.wait(0.1)
+		end
+	end
+end)
+
+--========================================================
+-- AUTO DOWNGRADE (SOUL GOLD)
+--========================================================
+local autoDowngradeSoulGold = false
+
+AutoFarmPotionsTab:CreateToggle({
+	Name = "Auto Downgrade Soul Gold",
+	CurrentValue = false,
+	Flag = "AutoDowngradeSoulGold",
+	Callback = function(v)
+		autoDowngradeSoulGold = v
+	end
+})
+
+task.spawn(function()
+	while true do
+		if autoDowngradeSoulGold then
+			CardRemote:FireServer("Downgrade", "Soul", "Gold")
+			task.wait()
+		else
+			task.wait(0.1)
+		end
+	end
+end)
+
+--========================================================
+-- AUTO DOWNGRADE (NINJA GOLD)
+--========================================================
+local autoDowngradeNinjaGold = false
+
+AutoFarmPotionsTab:CreateToggle({
+	Name = "Auto Downgrade Ninja Gold",
+	CurrentValue = false,
+	Flag = "AutoDowngradeNinjaGold",
+	Callback = function(v)
+		autoDowngradeNinjaGold = v
+	end
+})
+
+task.spawn(function()
+	while true do
+		if autoDowngradeNinjaGold then
+			CardRemote:FireServer("Downgrade", "Ninja", "Gold")
+			task.wait()
+		else
+			task.wait(0.1)
+		end
+	end
+end)
+
+--========================================================
+-- AUTO CRAFT HATCH TIME (2 MIN)
+--========================================================
+local autoCraftHatchTime = false
+
+AutoFarmPotionsTab:CreateToggle({
+	Name = "Auto Craft Hatch Time (2 Min)",
+	CurrentValue = false,
+	Flag = "AutoCraftHatchTime",
+	Callback = function(v)
+		autoCraftHatchTime = v
+	end
+})
+
+task.spawn(function()
+	while true do
+		if autoCraftHatchTime then
+			PotionRemote:FireServer("Craft", "HatchTime1")
+			task.wait()
+		else
+			task.wait(0.1)
+		end
+	end
+end)
