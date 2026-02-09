@@ -304,6 +304,7 @@ task.delay(1, function()
     end
 end)
 
+
 --========================================================
 -- AUTO FARM TOGGLE
 --========================================================
@@ -313,17 +314,10 @@ AutoFarmTab:CreateToggle({
     Flag = "AutoFarmPacks",
     Callback = function(v)
         autoFarmPacksEnabled = v
+        print("[AutoFarm] Auto Farm Packs toggled:", v)
     end
 })
 
--- Restore auto farm toggle on load
-task.delay(1, function()
-    local flag = Rayfield.Flags["AutoFarmPacks"]
-    if flag and flag.CurrentValue ~= nil then
-        autoFarmPacksEnabled = flag.CurrentValue
-        print("[AutoFarm] Restored Auto Farm:", autoFarmPacksEnabled)
-    end
-end)
 
 --========================================================
 -- PACK FILTER TOGGLES
@@ -362,10 +356,10 @@ task.delay(1, function()
 end)
 
 --========================================================
--- MUTATION CHECK FUNCTION
+-- MUTATION CHECK FUNCTION (robust + recursive)
 --========================================================
-local function mutationPasses(packModel)
-    -- If no mutation toggles are ON → allow all
+local function mutationPasses(packInstance)
+    -- Check if any mutation filter is ON
     local anyEnabled = false
     for _, enabled in pairs(mutationFilters) do
         if enabled then
@@ -373,34 +367,48 @@ local function mutationPasses(packModel)
             break
         end
     end
+
+    -- No filters ON → allow all packs
     if not anyEnabled then
+        print("[Mutation] No filters enabled → allow all mutations for pack:", packInstance.Name)
         return true
     end
 
-    -- Loop through all categories under the pack
-    for _, category in ipairs(packModel:GetChildren()) do
-        -- category is something like "Hunter"
-        for _, mutation in ipairs(category:GetChildren()) do
-            if mutationFilters[mutation.Name] then
-                return true -- allowed mutation found
+    -- Go through all descendants of the pack
+    for _, descendant in ipairs(packInstance:GetDescendants()) do
+        -- Only consider Instances that are Models or Parts (ignore values, etc.)
+        if descendant:IsA("Model") or descendant:IsA("Folder") or descendant:IsA("Part") then
+            local name = descendant.Name:gsub("%s+", ""):lower() -- trim spaces and lowercase
+            for filterName, enabled in pairs(mutationFilters) do
+                if enabled and name == filterName:lower() then
+                    print("[Mutation] Allowed mutation found:", descendant.Name, "in pack:", packInstance.Name)
+                    return true
+                end
             end
         end
     end
 
     -- No allowed mutations found
+    print("[Mutation] No allowed mutations in pack:", packInstance.Name)
     return false
 end
 
 
+
 --========================================================
--- FIND PLAYER PLOT
+-- GET LOCAL PLAYER PLOT (DISPLAY NAME BASED - ROBUST)
 --========================================================
 local function getPlayerPlot()
-    local plots = workspace:FindFirstChild("Plots")
-    if not plots then return nil end
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then
+        warn("[PlotDetect] workspace.Plots not found")
+        return nil
+    end
+
+    local displayName = string.lower(game.Players.LocalPlayer.DisplayName)
 
     for i = 1, 6 do
-        local plot = plots:FindFirstChild(tostring(i))
+        local plot = plotsFolder:FindFirstChild(tostring(i))
         if plot then
             local display =
                 plot:FindFirstChild("Map")
@@ -411,18 +419,24 @@ local function getPlayerPlot()
                 and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
 
             if display and typeof(display.Text) == "string" then
-                local textLower = string.lower(display.Text)
-                local playerLower = string.lower(player.Name)
-                if string.find(textLower, playerLower, 1, true) then
-                    print("[AutoFarm] Detected player plot:", i, "Text:", display.Text)
-                    return i
+                local text = string.lower(display.Text)
+
+                -- Text format: "<DisplayName>'s Collection"
+                if string.find(text, displayName, 1, true) then
+                    print("[PlotDetect] Found player plot:", i, "Text:", display.Text)
+                    return plot, i
                 end
             end
         end
     end
 
+    warn("[PlotDetect] No plot found for player:", game.Players.LocalPlayer.DisplayName)
     return nil
 end
+
+
+
+-- AUTO FARM SECTION
 
 task.spawn(function()
 	local cachedPlot = nil
@@ -453,7 +467,7 @@ task.spawn(function()
 
 		local foundOwnedPack = false
 		for _, packModel in ipairs(packsInWorkspace:GetChildren()) do
-			if packModel.Name:sub(-2) == "-" .. tostring(cachedPlot) then
+			if string.find(packModel.Name, "-" .. tostring(cachedPlot), 1, true) then
 				foundOwnedPack = true
 				break
 			end
@@ -468,11 +482,15 @@ task.spawn(function()
 			if not isEnabled then continue end
 
 			for _, packModel in ipairs(packsInWorkspace:GetChildren()) do
-				if packModel.Name:sub(-2) == "-" .. tostring(cachedPlot) then
-					if packModel:FindFirstChild(packName) and mutationPasses(packModel) then
-						CardRemote:FireServer("BuyPack", packModel.Name)
-						task.wait(0.2)
+				if string.find(packModel.Name, "-" .. tostring(cachedPlot), 1, true) then
+					local packInstance = packModel:FindFirstChild(packName)
+					
+					if packInstance and mutationPasses(packInstance) then
+    						print("[AutoFarm] Buying pack:", packName, "from", packModel.Name)
+    						CardRemote:FireServer("BuyPack", packModel.Name)
+    						task.wait(0.2)
 					end
+
 				end
 			end
 		end
@@ -759,44 +777,190 @@ local function getEquippedPack()
 end
 
 --========================================================
--- AUTO PLACE BUTTON
+-- AUTO PLACE EQUIPPED PACKS (KEYBIND "X" - TELEPORT + FAST WALK + SUPER SPAM)
 --========================================================
+local autoPlaceEnabled = false
 
+AutoPlaceTab:CreateKeybind({
+    Name = "Auto Place Equipped Pack",
+    CurrentKeybind = "X",
+    HoldToInteract = false,
+    Flag = "AutoPlaceKeybind",
+    Callback = function()
+        autoPlaceEnabled = not autoPlaceEnabled
 
-
-AutoPlaceTab:CreateButton({
-	Name = "Auto Place Equipped Pack",
-	Callback = function()
-		local character = player.Character or player.CharacterAdded:Wait()
-		local root = character:WaitForChild("HumanoidRootPart")
-
-		local packName = getEquippedPack()
-		if not packName then
-			Rayfield:Notify({
-				Title = "Auto Place",
-				Content = "No pack equipped.",
-				Duration = 4
-			})
-			return
-		end
-
-		for _, pos in ipairs(PLACE_POSITIONS) do
-			-- Move first (required)
-			root.CFrame = CFrame.new(pos)
-			task.wait(0.12)
-
-			-- Place pack
-			CardRemote:FireServer("Place", packName)
-			task.wait(0.12)
-		end
-
-		Rayfield:Notify({
-			Title = "Auto Place",
-			Content = "Finished placing packs.",
-			Duration = 4
-		})
-	end
+        Rayfield:Notify({
+            Title = "Auto Place",
+            Content = autoPlaceEnabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
 })
+
+-- Segments: teleport → walk → spam
+local SEGMENTS = {
+    {teleport = Vector3.new(-617, 7, -95), walkTo = Vector3.new(-598, 7, -165)},
+    {teleport = Vector3.new(-604, 7, -94), walkTo = Vector3.new(-580, 7, -168)},
+    {teleport = Vector3.new(-571, 7, -96), walkTo = Vector3.new(-564, 7, -135)}
+}
+
+local STEP_SIZE = 20        -- studs per tick (faster walk)
+local PLACE_INTERVAL = 0.01 -- seconds between placement (faster spam)
+
+--========================================================
+-- GET PLAYER PLOT FUNCTION
+--========================================================
+local function getPlayerPlot()
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then
+        warn("[AutoPlace] Plots folder not found")
+        return nil
+    end
+
+    local usernameLower = string.lower(player.Name)
+    local displayNameLower = string.lower(player.DisplayName)
+
+    for _, plot in ipairs(plotsFolder:GetChildren()) do
+        if not plot:IsA("Model") and not plot:IsA("Folder") then continue end
+
+        local display =
+            plot:FindFirstChild("Map")
+            and plot.Map:FindFirstChild("Display")
+            and plot.Map.Display:FindFirstChild("Top")
+            and plot.Map.Display.Top:FindFirstChild("Gui")
+            and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+            and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+        if display and typeof(display.Text) == "string" then
+            local textLower = string.lower(display.Text)
+            if string.find(textLower, usernameLower, 1, true)
+            or string.find(textLower, displayNameLower, 1, true) then
+                return plot
+            end
+        end
+    end
+
+    warn("[AutoPlace] No plot found for player:", player.Name)
+    return nil
+end
+
+--========================================================
+-- AUTO PLACE EQUIPPED PACKS (KEYBIND "X")
+--========================================================
+local autoPlaceEnabled = false
+
+AutoPlaceTab:CreateKeybind({
+    Name = "Auto Place Equipped Pack",
+    CurrentKeybind = "X",
+    HoldToInteract = false,
+    Flag = "AutoPlaceKeybind",
+    Callback = function()
+        autoPlaceEnabled = not autoPlaceEnabled
+
+        Rayfield:Notify({
+            Title = "Auto Place",
+            Content = autoPlaceEnabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+local STEP_SIZE = 20
+local PLACE_INTERVAL = 0.05
+
+--========================================================
+-- GET PLAYER PLOT
+--========================================================
+local function getPlayerPlot()
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then return nil end
+
+    local usernameLower = string.lower(player.Name)
+    local displayNameLower = string.lower(player.DisplayName)
+
+    for _, plot in ipairs(plotsFolder:GetChildren()) do
+        if not plot:IsA("Model") and not plot:IsA("Folder") then continue end
+
+        local display =
+            plot:FindFirstChild("Map")
+            and plot.Map:FindFirstChild("Display")
+            and plot.Map.Display:FindFirstChild("Top")
+            and plot.Map.Display.Top:FindFirstChild("Gui")
+            and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+            and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+        if display and typeof(display.Text) == "string" then
+            local textLower = string.lower(display.Text)
+            if string.find(textLower, usernameLower, 1, true)
+            or string.find(textLower, displayNameLower, 1, true) then
+                return plot
+            end
+        end
+    end
+
+    return nil
+end
+
+--========================================================
+-- AUTO PLACE LOOP
+--========================================================
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    while task.wait(0.1) do
+        if not autoPlaceEnabled then continue end
+
+        -- Get player plot
+        local plot = getPlayerPlot()
+        if not plot then
+            task.wait(1)
+            continue
+        end
+
+        -- Find the floor part
+        local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
+        if not floor or not floor:IsA("BasePart") then
+            task.wait(1)
+            continue
+        end
+
+        -- Get the equipped pack
+        local packName = getEquippedPack()
+        if not packName then
+            task.wait(0.5)
+            continue
+        end
+
+        -- Place packs randomly around the floor
+        local floorSize = floor.Size
+        local floorPos = floor.Position
+
+        -- Example: place 20 packs per loop randomly on floor
+        for i = 1, 20 do
+            if not autoPlaceEnabled then break end
+
+            local randomX = (math.random() - 0.5) * floorSize.X
+            local randomZ = (math.random() - 0.5) * floorSize.Z
+            local placePos = floorPos + Vector3.new(randomX, 3, randomZ)
+
+            -- Move player above that position
+            root.CFrame = CFrame.new(placePos)
+            task.wait(0.01)
+
+            -- Fire the placement
+            pcall(function()
+                CardRemote:FireServer("Place", packName)
+            end)
+
+            task.wait(PLACE_INTERVAL)
+        end
+    end
+end)
+
+
+
 
 --========================================================
 -- AUTO 2-MINUTE SPEEDUP (KEYBIND)
@@ -827,6 +991,96 @@ task.spawn(function()
 end)
 
 --========================================================
+-- AUTO INTERACT PACKS (KEYBIND "C" - PLAYER INDEX BASED)
+--========================================================
+local autoInteractEnabled = false
+
+AutoPlaceTab:CreateKeybind({
+    Name = "Auto Interact Packs",
+    CurrentKeybind = "C",
+    HoldToInteract = false,
+    Flag = "AutoInteractKeybind",
+    Callback = function()
+        autoInteractEnabled = not autoInteractEnabled
+
+        Rayfield:Notify({
+            Title = "Auto Interact",
+            Content = autoInteractEnabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+local function getPlayerPlot()
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then return nil end
+
+    local playerNameLower = string.lower(player.Name)
+    local displayNameLower = string.lower(player.DisplayName)
+
+    for i, plot in ipairs(plotsFolder:GetChildren()) do
+        local display =
+            plot:FindFirstChild("Map")
+            and plot.Map:FindFirstChild("Display")
+            and plot.Map.Display:FindFirstChild("Top")
+            and plot.Map.Display.Top:FindFirstChild("Gui")
+            and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+            and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+        if display and typeof(display.Text) == "string" then
+            local textLower = string.lower(display.Text)
+            if string.find(textLower, playerNameLower, 1, true)
+            or string.find(textLower, displayNameLower, 1, true) then
+                return plot
+            end
+        end
+    end
+
+    return nil
+end
+
+
+--========================================================
+-- AUTO INTERACT LOOP
+--========================================================
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    while task.wait(0.05) do
+        if not autoInteractEnabled then continue end
+
+        local plot = getPlayerPlot()
+        if not plot then continue end
+
+        -- Try to find Packs folder (robust search)
+        local packsFolder = plot:FindFirstChild("Packs") or plot:FindFirstChild("Client") and plot.Client:FindFirstChild("Packs")
+        if not packsFolder then continue end
+
+        for _, pack in ipairs(packsFolder:GetChildren()) do
+            if not pack:IsA("Model") then continue end
+
+            for _, prompt in ipairs(pack:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    root.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                    task.wait(0.05)
+
+                    pcall(function()
+                        fireproximityprompt(prompt)
+                    end)
+
+                    task.wait(0.05)
+                end
+            end
+        end
+    end
+end)
+
+
+
+
+--========================================================
 -- AUTO OPEN PACKS
 --========================================================
 local RunService = game:GetService("RunService")
@@ -844,32 +1098,45 @@ AutoPlaceTab:CreateToggle({
 })
 
 --========================================================
--- FIND PLAYER PLOT (REUSED LOGIC)
+-- FIND PLAYER PLOT (USERNAME + DISPLAYNAME SUPPORT)
 --========================================================
 local function getPlayerPlot()
-	local plots = workspace:FindFirstChild("Plots")
-	if not plots then return nil end
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then
+        print("[AutoFarm] Plots folder not found")
+        return nil
+    end
 
-	for i = 1, 6 do
-		local plot = plots:FindFirstChild(tostring(i))
-		if plot then
-			local display =
-				plot:FindFirstChild("Map")
-				and plot.Map:FindFirstChild("Display")
-				and plot.Map.Display:FindFirstChild("Top")
-				and plot.Map.Display.Top:FindFirstChild("Gui")
-				and plot.Map.Display.Top.Gui:FindFirstChild("Display")
-				and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+    local usernameLower = string.lower(player.Name)
+    local displayNameLower = string.lower(player.DisplayName)
 
-			if display and typeof(display.Text) == "string" then
-				if string.find(string.lower(display.Text), string.lower(player.Name), 1, true) then
-					return i
-				end
-			end
-		end
-	end
+    for i = 1, 6 do
+        local plot = plots:FindFirstChild(tostring(i))
+        if plot then
+            local display =
+                plot:FindFirstChild("Map")
+                and plot.Map:FindFirstChild("Display")
+                and plot.Map.Display:FindFirstChild("Top")
+                and plot.Map.Display.Top:FindFirstChild("Gui")
+                and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+                and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
 
-	return nil
+            if display and typeof(display.Text) == "string" then
+                print("[AutoFarm] Checking plot", i, "Display text:", display.Text)
+
+                local textLower = string.lower(display.Text)
+
+                if string.find(textLower, usernameLower, 1, true)
+                or string.find(textLower, displayNameLower, 1, true) then
+                    print("[AutoFarm] Detected player plot:", i)
+                    return i
+                end
+            end
+        end
+    end
+
+    print("[AutoFarm] No plot found for player")
+    return nil
 end
 
 --========================================================
