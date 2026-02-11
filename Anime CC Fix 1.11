@@ -716,99 +716,26 @@ local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card"
 local PotionRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Potion")
 
 --========================================================
--- PLACE POSITIONS (ORDER MATTERS)
---========================================================
-local PLACE_POSITIONS = {
-	Vector3.new(-452, 7, -359),
-	Vector3.new(-453, 7, -347),
-	Vector3.new(-451, 7, -335),
-	Vector3.new(-452, 7, -323),
-	Vector3.new(-451, 7, -309),
-	Vector3.new(-462, 7, -304),
-	Vector3.new(-469, 7, -292),
-	Vector3.new(-483, 7, -291),
-	Vector3.new(-476, 7, -302),
-	Vector3.new(-466, 7, -314),
-	Vector3.new(-464, 7, -326),
-	Vector3.new(-465, 7, -338),
-	Vector3.new(-467, 7, -349),
-	Vector3.new(-467, 7, -361),
-	Vector3.new(-481, 7, -361),
-	Vector3.new(-481, 7, -349),
-	Vector3.new(-480, 7, -335),
-	Vector3.new(-480, 7, -323),
-	Vector3.new(-482, 7, -311),
-	Vector3.new(-492, 7, -300),
-	Vector3.new(-495, 7, -311),
-	Vector3.new(-495, 7, -322),
-	Vector3.new(-493, 7, -333),
-	Vector3.new(-494, 7, -345),
-	Vector3.new(-494, 7, -358),
-	Vector3.new(-506, 7, -350),
-	Vector3.new(-508, 7, -331),
-	Vector3.new(-508, 7, -320),
-	Vector3.new(-494, 7, -288),
-	Vector3.new(-504, 7, -363),
-	Vector3.new(-504, 7, -343),
-	Vector3.new(-503, 7, -300),
-	Vector3.new(-459, 7, -296)
-}
-
-
---========================================================
 -- GET EQUIPPED PACK NAME
 --========================================================
 local function getEquippedPack()
-	local charFolder = workspace:FindFirstChild("Players")
-		and workspace.Players:FindFirstChild(player.Name)
+    local charFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild(player.Name)
+    if not charFolder then return nil end
 
-	if not charFolder then return nil end
+    local hrp = charFolder:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
 
-	local hrp = charFolder:FindFirstChild("HumanoidRootPart")
-	if not hrp then return nil end
+    for _, obj in ipairs(hrp:GetChildren()) do
+        if obj:IsA("Model") then
+            return obj.Name
+        end
+    end
 
-	for _, obj in ipairs(hrp:GetChildren()) do
-		if obj:IsA("Model") then
-			return obj.Name
-		end
-	end
-
-	return nil
+    return nil
 end
 
 --========================================================
--- AUTO PLACE EQUIPPED PACKS (KEYBIND "X" - TELEPORT + FAST WALK + SUPER SPAM)
---========================================================
-local autoPlaceEnabled = false
-
-AutoPlaceTab:CreateKeybind({
-    Name = "Auto Place Equipped Pack",
-    CurrentKeybind = "X",
-    HoldToInteract = false,
-    Flag = "AutoPlaceKeybind",
-    Callback = function()
-        autoPlaceEnabled = not autoPlaceEnabled
-
-        Rayfield:Notify({
-            Title = "Auto Place",
-            Content = autoPlaceEnabled and "Enabled" or "Disabled",
-            Duration = 2
-        })
-    end
-})
-
--- Segments: teleport → walk → spam
-local SEGMENTS = {
-    {teleport = Vector3.new(-617, 7, -95), walkTo = Vector3.new(-598, 7, -165)},
-    {teleport = Vector3.new(-604, 7, -94), walkTo = Vector3.new(-580, 7, -168)},
-    {teleport = Vector3.new(-571, 7, -96), walkTo = Vector3.new(-564, 7, -135)}
-}
-
-local STEP_SIZE = 20        -- studs per tick (faster walk)
-local PLACE_INTERVAL = 0.01 -- seconds between placement (faster spam)
-
---========================================================
--- GET PLAYER PLOT FUNCTION
+-- GET PLAYER PLOT
 --========================================================
 local function getPlayerPlot()
     local plotsFolder = workspace:FindFirstChild("Plots")
@@ -824,17 +751,13 @@ local function getPlayerPlot()
         if not plot:IsA("Model") and not plot:IsA("Folder") then continue end
 
         local display =
-            plot:FindFirstChild("Map")
-            and plot.Map:FindFirstChild("Display")
-            and plot.Map.Display:FindFirstChild("Top")
-            and plot.Map.Display.Top:FindFirstChild("Gui")
-            and plot.Map.Display.Top.Gui:FindFirstChild("Display")
-            and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+            plot:FindFirstChild("Map") and plot.Map:FindFirstChild("Display") and
+            plot.Map.Display:FindFirstChild("Top") and plot.Map.Display.Top:FindFirstChild("Gui") and
+            plot.Map.Display.Top.Gui:FindFirstChild("Display") and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
 
         if display and typeof(display.Text) == "string" then
             local textLower = string.lower(display.Text)
-            if string.find(textLower, usernameLower, 1, true)
-            or string.find(textLower, displayNameLower, 1, true) then
+            if string.find(textLower, usernameLower, 1, true) or string.find(textLower, displayNameLower, 1, true) then
                 return plot
             end
         end
@@ -865,100 +788,69 @@ AutoPlaceTab:CreateKeybind({
     end
 })
 
-local STEP_SIZE = 20
-local PLACE_INTERVAL = 0.05
-
---========================================================
--- GET PLAYER PLOT
---========================================================
-local function getPlayerPlot()
-    local plotsFolder = workspace:FindFirstChild("Plots")
-    if not plotsFolder then return nil end
-
-    local usernameLower = string.lower(player.Name)
-    local displayNameLower = string.lower(player.DisplayName)
-
-    for _, plot in ipairs(plotsFolder:GetChildren()) do
-        if not plot:IsA("Model") and not plot:IsA("Folder") then continue end
-
-        local display =
-            plot:FindFirstChild("Map")
-            and plot.Map:FindFirstChild("Display")
-            and plot.Map.Display:FindFirstChild("Top")
-            and plot.Map.Display.Top:FindFirstChild("Gui")
-            and plot.Map.Display.Top.Gui:FindFirstChild("Display")
-            and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
-
-        if display and typeof(display.Text) == "string" then
-            local textLower = string.lower(display.Text)
-            if string.find(textLower, usernameLower, 1, true)
-            or string.find(textLower, displayNameLower, 1, true) then
-                return plot
-            end
-        end
-    end
-
-    return nil
-end
+-- Grid settings
+local PLACE_INTERVAL = 0.02           -- delay between placing packs
+local PACK_SPACING_X = 3           -- distance between packs horizontally
+local PACK_SPACING_Z = 3 * 2.25     -- distance between rows (vertical spacing)
+local EDGE_PADDING = 1.5              -- distance from floor edges
 
 --========================================================
 -- AUTO PLACE LOOP
 --========================================================
 task.spawn(function()
-    local player = game.Players.LocalPlayer
     local char = player.Character or player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
     while task.wait(0.1) do
         if not autoPlaceEnabled then continue end
 
-        -- Get player plot
+        -- Find player plot
         local plot = getPlayerPlot()
         if not plot then
             task.wait(1)
             continue
         end
 
-        -- Find the floor part
+        -- Find floor
         local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
         if not floor or not floor:IsA("BasePart") then
             task.wait(1)
             continue
         end
 
-        -- Get the equipped pack
+        -- Get equipped pack
         local packName = getEquippedPack()
         if not packName then
             task.wait(0.5)
             continue
         end
 
-        -- Place packs randomly around the floor
-        local floorSize = floor.Size
-        local floorPos = floor.Position
+        -- Floor math
+        local floorCF = floor.CFrame
+        local size = floor.Size
+        local right = floorCF.RightVector
+        local forward = -floorCF.LookVector
 
-        -- Example: place 20 packs per loop randomly on floor
-        for i = 1, 20 do
-            if not autoPlaceEnabled then break end
+        -- Start position at corner with padding
+        local startPos = floorCF.Position - right * (size.X/2 - EDGE_PADDING) - forward * (size.Z/2 - EDGE_PADDING) + Vector3.new(0, 3, 0)
+        
+        -- Place packs in grid
+        for x = 0, size.X - EDGE_PADDING * 2, PACK_SPACING_X do
+            for z = 0, size.Z - EDGE_PADDING * 2, PACK_SPACING_Z do
+                if not autoPlaceEnabled then break end
 
-            local randomX = (math.random() - 0.5) * floorSize.X
-            local randomZ = (math.random() - 0.5) * floorSize.Z
-            local placePos = floorPos + Vector3.new(randomX, 3, randomZ)
+                local placePos = startPos + right * x + forward * z
+                root.CFrame = CFrame.new(placePos)
 
-            -- Move player above that position
-            root.CFrame = CFrame.new(placePos)
-            task.wait(0.01)
+                pcall(function()
+                    CardRemote:FireServer("Place", packName)
+                end)
 
-            -- Fire the placement
-            pcall(function()
-                CardRemote:FireServer("Place", packName)
-            end)
-
-            task.wait(PLACE_INTERVAL)
+                task.wait(PLACE_INTERVAL)
+            end
         end
     end
 end)
-
 
 
 
@@ -989,6 +881,387 @@ task.spawn(function()
 		PotionRemote:FireServer("Apply", "HatchTime1")
 	end
 end)
+
+--========================================================
+-- AUTOMATIC POTIONS (TOGGLE)
+--========================================================
+local autoPotionsEnabled = false
+
+AutoPlaceTab:CreateToggle({
+    Name = "Automatic Potions",
+    CurrentValue = false,
+    Flag = "AutoPotionsToggle",
+    Callback = function(v)
+        autoPotionsEnabled = v
+        Rayfield:Notify({
+            Title = "Automatic Potions",
+            Content = autoPotionsEnabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+-- Start monitoring
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+
+    while task.wait(0.1) do
+        if not autoPotionsEnabled then continue end
+
+        -- Get player plot
+        local plot = getPlayerPlot()
+        if not plot then
+            task.wait(1)
+            continue
+        end
+
+        -- Find the Packs folder
+        local packsFolder = plot:FindFirstChild("Packs") 
+                           or (plot:FindFirstChild("Client") and plot.Client:FindFirstChild("Packs"))
+        if not packsFolder then
+            task.wait(1)
+            continue
+        end
+
+        -- Wait until there are exactly 33 or more packs
+        if #packsFolder:GetChildren() >= 33 then
+            -- Fire potion remote exactly 56 times
+            for i = 1, 56 do
+                pcall(function()
+                    PotionRemote:FireServer("Apply", "HatchTime1")
+                end)
+                task.wait(0.05) -- short delay to prevent spam issues
+            end
+
+            -- Wait until all packs are gone before restarting
+            repeat
+                task.wait(0.5)
+            until #packsFolder:GetChildren() == 0
+        end
+    end
+end)
+
+--========================================================
+-- AUTO INTERACT PACKS (TOGGLE + PACK COUNT RULES)
+--========================================================
+local autoInteractEnabled = false
+
+AutoPlaceTab:CreateToggle({
+    Name = "Auto Interact Packs",
+    CurrentValue = false,
+    Flag = "AutoInteractToggle",
+    Callback = function(v)
+        autoInteractEnabled = v
+
+        Rayfield:Notify({
+            Title = "Auto Interact Packs",
+            Content = autoInteractEnabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+--========================================================
+-- AUTO INTERACT LOOP
+--========================================================
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    while task.wait(0.1) do
+        if not autoInteractEnabled then continue end
+
+        local plot = getPlayerPlot()
+        if not plot then
+            task.wait(1)
+            continue
+        end
+
+        -- Find the Packs folder (robust)
+        local packsFolder = plot:FindFirstChild("Packs") or (plot:FindFirstChild("Client") and plot.Client:FindFirstChild("Packs"))
+        if not packsFolder then
+            task.wait(1)
+            continue
+        end
+
+        -- Only activate if there are 33 or more packs
+        if #packsFolder:GetChildren() >= 33 then
+            for _, pack in ipairs(packsFolder:GetChildren()) do
+                if not pack:IsA("Model") then continue end
+
+                for _, prompt in ipairs(pack:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        -- Move to prompt
+                        root.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                        task.wait(0.05)
+
+                        pcall(function()
+                            fireproximityprompt(prompt)
+                        end)
+
+                        task.wait(0.05)
+                    end
+                end
+            end
+
+            -- Wait until all packs are gone before restarting
+            repeat
+                task.wait(0.5)
+            until #packsFolder:GetChildren() == 0
+        end
+    end
+end)
+
+
+--========================================================
+-- SPEED PLACING
+--========================================================
+
+local SpeedPlacingEnabled = false
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card")
+
+-- Optional: increase speed for auto-walking
+local originalWalkSpeed = 16
+local tempWalkSpeed = 50
+
+--========================================================
+-- HELPERS
+--========================================================
+local function getCharacter()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local humanoid = char:WaitForChild("Humanoid")
+    return hrp, humanoid
+end
+
+local function getEquippedPack()
+    local charFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild(player.Name)
+    if not charFolder then return nil end
+
+    local hrp = charFolder:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    for _, obj in ipairs(hrp:GetChildren()) do
+        if obj:IsA("Model") then
+            return obj.Name
+        end
+    end
+    return nil
+end
+
+local function walkStuds(hrp, humanoid, studs)
+    local goal = hrp.Position + hrp.CFrame.LookVector * studs
+    humanoid:MoveTo(goal)
+    while (hrp.Position - goal).Magnitude > 1 and SpeedPlacingEnabled do
+        task.wait(0.05)
+        humanoid:MoveTo(goal)
+    end
+end
+
+local function rotate(hrp, degrees)
+    hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(degrees), 0)
+    task.wait(0.1) -- small pause to let humanoid rotate
+end
+
+--========================================================
+-- SPAM PLACE LOOP
+--========================================================
+task.spawn(function()
+    while true do
+        if SpeedPlacingEnabled then
+            local plot = getPlayerPlot() -- use your existing function
+            if plot and plot:FindFirstChild("Packs") then
+                local packsFolder = plot.Packs
+
+                if #packsFolder:GetChildren() >= 33 then
+                    repeat
+                        task.wait(0.25)
+                    until not SpeedPlacingEnabled or #packsFolder:GetChildren() == 0
+                else
+                    local packName = getEquippedPack()
+                    if packName then
+                        CardRemote:FireServer("Place", packName)
+                    end
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+end)
+
+--========================================================
+-- MOVEMENT LOOP (RECTANGLE)
+--========================================================
+-- walk a rectangle continuously
+task.spawn(function()
+    while SpeedPlacingEnabled do
+        local hrp, humanoid = getCharacter()
+        humanoid.WalkSpeed = tempWalkSpeed
+
+        -- Define rectangle sides
+        local sides = {70, 50, 70, 50}       -- distances
+        local turns = {-90, -90, -90, -90}   -- left turns
+        local index = 1
+
+        while SpeedPlacingEnabled do
+            -- Rotate first
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(turns[index]), 0)
+            task.wait(0.1)
+
+            -- Calculate goal
+            local goal = hrp.Position + hrp.CFrame.LookVector * sides[index]
+
+            -- Move to goal
+            humanoid:MoveTo(goal)
+            local success = humanoid.MoveToFinished:Wait()  -- waits until goal reached
+
+            -- Check toggle again before next segment
+            if not SpeedPlacingEnabled then break end
+
+            -- Next side
+            index = index + 1
+            if index > #sides then
+                index = 1
+            end
+        end
+        task.wait(0.1)
+    end
+
+    -- Reset speed when toggle is off
+    local _, humanoid = getCharacter()
+    humanoid.WalkSpeed = originalWalkSpeed
+end)
+
+
+
+
+--========================================================
+-- TOGGLE IN TAB
+--========================================================
+AutoPlaceTab:CreateToggle({
+    Name = "Speed Placing",
+    CurrentValue = false,
+    Flag = "SpeedPlacingToggle",
+    Callback = function(v)
+        SpeedPlacingEnabled = v
+
+        Rayfield:Notify({
+            Title = "Speed Placing",
+            Content = v and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+--========================================================
+-- RECTANGLE MOVEMENT TOGGLE
+--========================================================
+
+local RectangleMoveEnabled = false
+
+-- Services
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Optional: adjust walk speed
+local originalWalkSpeed = 16
+local tempWalkSpeed = 50
+
+-- Helper to get character, HRP, and humanoid
+local function getCharacter()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local humanoid = char:WaitForChild("Humanoid")
+    return hrp, humanoid
+end
+
+-- Rotate HRP by degrees
+local function rotate(hrp, degrees)
+    hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(degrees), 0)
+    task.wait(0.1)
+end
+
+-- Move HRP forward a number of studs
+local function walkStuds(hrp, humanoid, studs)
+    local goal = hrp.Position + hrp.CFrame.LookVector * studs
+    humanoid:MoveTo(goal)
+    humanoid.MoveToFinished:Wait()
+end
+
+-- Rectangle movement loop
+task.spawn(function()
+    local hrp, humanoid = getCharacter()
+    humanoid.WalkSpeed = tempWalkSpeed
+
+    while true do
+        if RectangleMoveEnabled then
+            -- Save starting position
+            local startCFrame = hrp.CFrame
+
+            -- Define movement sequence
+            local sides = {55, 18, 55, 18, 65, 30}  -- distances
+            local turns = {-90, -90, 90, 90, 90, 0} -- rotations after each side
+            -- Note: last turn is 0 because we teleport back
+
+            for i = 1, #sides do
+                local goal = hrp.Position + hrp.CFrame.LookVector * sides[i]
+                local startTime = tick()
+
+                -- Move toward goal
+                while (hrp.Position - goal).Magnitude > 1 and RectangleMoveEnabled do
+                    humanoid:MoveTo(goal)
+                    task.wait(0.05)
+
+                    -- Timeout if stuck
+                    if tick() - startTime > 5 then
+                        warn("[MiddleLineMove] Obstacle detected, skipping side " .. i)
+                        break
+                    end
+                end
+
+                -- Rotate after moving
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(turns[i]), 0)
+                task.wait(0.1)
+            end
+
+            -- Teleport back to start
+            hrp.CFrame = startCFrame
+            task.wait(0.2) -- small pause before next loop
+        else
+            humanoid.WalkSpeed = originalWalkSpeed
+            task.wait(0.1)
+        end
+    end
+end)
+
+
+
+--========================================================
+-- CREATE TOGGLE IN TAB
+--========================================================
+AutoPlaceTab:CreateToggle({
+    Name = "Rectangle Movement",
+    CurrentValue = false,
+    Flag = "RectangleMoveToggle",
+    Callback = function(v)
+        RectangleMoveEnabled = v
+
+        Rayfield:Notify({
+            Title = "Rectangle Movement",
+            Content = v and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+
 
 --========================================================
 -- AUTO INTERACT PACKS (KEYBIND "C" - PLAYER INDEX BASED)
@@ -1184,7 +1457,126 @@ task.spawn(function()
 	end
 end)
 
+--========================================================
+-- FULL AUTO SEQUENCE (PLACE → POTIONS → INTERACT → RESET)
+--========================================================
+local fullAutoEnabled = false
 
+AutoPlaceTab:CreateToggle({
+    Name = "Full Auto Sequence",
+    CurrentValue = false,
+    Flag = "FullAutoSequenceToggle",
+    Callback = function(v)
+        fullAutoEnabled = v
+
+        Rayfield:Notify({
+            Title = "Full Auto Sequence",
+            Content = v and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
+
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+    local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card")
+    local PotionRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Potion")
+    local originalWalkSpeed = 16
+    local tempWalkSpeed = 50
+
+    while true do
+        task.wait(0.1)
+        if not fullAutoEnabled then continue end
+
+        -- Get character
+        local hrp, humanoid = getCharacter()
+        local startCFrame = hrp.CFrame
+        humanoid.WalkSpeed = tempWalkSpeed
+
+        -- Get plot
+        local plot = getPlayerPlot()
+        if not plot or not plot:FindFirstChild("Packs") then
+            task.wait(1)
+            continue
+        end
+        local packsFolder = plot.Packs
+
+        -- =====================
+        -- Figure 8 / rectangle walk + place packs
+        -- =====================
+        local equippedPack = getEquippedPack()
+        if not equippedPack then continue end
+
+        local moveSequence = {
+            {distance = 55, turn = 0},
+            {distance = 18, turn = -90},
+            {distance = 55, turn = -90},
+            {distance = 18, turn = 90},
+            {distance = 58, turn = 90},
+            {distance = 20, turn = 90},
+        }
+
+        for _, step in ipairs(moveSequence) do
+            -- Move forward
+            local goal = hrp.Position + hrp.CFrame.LookVector * step.distance
+            local startTime = tick()
+            while (hrp.Position - goal).Magnitude > 1 and fullAutoEnabled do
+                humanoid:MoveTo(goal)
+                task.wait(0.05)
+                if tick() - startTime > 5 then break end -- skip if stuck
+                -- Place pack continuously while moving
+                if #packsFolder:GetChildren() < 33 then
+                    pcall(function()
+                        CardRemote:FireServer("Place", equippedPack)
+                    end)
+                end
+            end
+
+            -- Rotate
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(step.turn), 0)
+            task.wait(0.1)
+        end
+
+        -- Teleport back to start
+        hrp.CFrame = startCFrame
+        task.wait(0.2)
+
+        -- =====================
+        -- Automatic potions (wait until finished)
+        -- =====================
+        if #packsFolder:GetChildren() >= 33 then
+            for i = 1, 56 do
+                pcall(function()
+                    PotionRemote:FireServer("Apply", "HatchTime1")
+                end)
+                task.wait(0.05)
+            end
+
+            -- Wait until all packs are hatched
+            repeat
+                task.wait(0.5)
+            until #packsFolder:GetChildren() == 0
+        end
+
+        -- =====================
+        -- Auto interact with remaining packs
+        -- =====================
+        for _, pack in ipairs(packsFolder:GetChildren()) do
+            if not pack:IsA("Model") then continue end
+            for _, prompt in ipairs(pack:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    hrp.CFrame = prompt.Parent.CFrame + Vector3.new(0, 3, 0)
+                    task.wait(0.05)
+                    pcall(function() fireproximityprompt(prompt) end)
+                    task.wait(0.05)
+                end
+            end
+        end
+
+        -- Small pause before repeating sequence
+        task.wait(0.5)
+    end
+end)
 
 --========================================================
 -- MISC TAB
@@ -1507,6 +1899,38 @@ MiscTab:CreateButton({
 	end
 })
 
+MiscTab:CreateButton({
+	Name = "Set All Plots Display Text",
+	Callback = function()
+		local plotsFolder = workspace:FindFirstChild("Plots")
+		if not plotsFolder then
+			warn("[StreamSaver] Plots folder not found")
+			return
+		end
+
+		for i = 1, 6 do
+			local plot = plotsFolder:FindFirstChild(tostring(i))
+			if plot then
+				local display =
+					plot:FindFirstChild("Map")
+					and plot.Map:FindFirstChild("Display")
+					and plot.Map.Display:FindFirstChild("Top")
+					and plot.Map.Display.Top:FindFirstChild("Gui")
+					and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+					and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+				if display and (display:IsA("TextLabel") or display:IsA("TextBox")) then
+					display.Text = "DurDomHub's Collection"
+				else
+					warn("[StreamSaver] Display not found for plot " .. i)
+				end
+			else
+				warn("[StreamSaver] Plot " .. i .. " not found")
+			end
+		end
+	end
+})
+
 --========================================================
 -- STREAMSAVER TAB
 --========================================================
@@ -1514,7 +1938,7 @@ MiscTab:CreateButton({
 local StreamSaverTab = Window:CreateTab("StreamSaver", 4483362458)
 StreamSaverTab:CreateSection("Display Tools")
 
-StreamSaverTab:CreateButton({
+MiscTab:CreateButton({
 	Name = "Set All Plots Display Text",
 	Callback = function()
 		local plotsFolder = workspace:FindFirstChild("Plots")
@@ -1555,79 +1979,43 @@ local AutoFarmPotionsTab = Window:CreateTab("AutoFarm Potions", 4483362458)
 AutoFarmPotionsTab:CreateSection("Potion & Downgrade Automation")
 
 --========================================================
--- AUTO DOWNGRADE (PIRATE GOLD)
+-- AUTO DOWNGRADE MUTATIONS (Pirate, Soul, Ninja)
 --========================================================
-local autoDowngradeEnabled = false
+local cardTypes = {"Pirate", "Soul", "Ninja"}
+local mutations = {"Gold", "Emerald", "Rainbow", "Diamond", "Void"} -- Gold included
 
-AutoFarmPotionsTab:CreateToggle({
-	Name = "Auto Downgrade Pirate Gold",
-	CurrentValue = false,
-	Flag = "AutoDowngradePirateGold",
-	Callback = function(v)
-		autoDowngradeEnabled = v
+local toggles = {} -- store references if needed
+
+for _, cardType in ipairs(cardTypes) do
+	for _, mutation in ipairs(mutations) do
+		local flagName = ("AutoDowngrade_%s_%s"):format(cardType, mutation)
+		local toggleName = ("Auto Downgrade %s %s"):format(cardType, mutation)
+
+		toggles[flagName] = false
+
+		AutoFarmPotionsTab:CreateToggle({
+			Name = toggleName,
+			CurrentValue = false,
+			Flag = flagName,
+			Callback = function(v)
+				toggles[flagName] = v
+			end
+		})
+
+		-- Loop for each toggle
+		task.spawn(function()
+			while true do
+				if toggles[flagName] then
+					CardRemote:FireServer("Downgrade", cardType, mutation)
+					task.wait() -- minimal yield for speed
+				else
+					task.wait(0.1)
+				end
+			end
+		end)
 	end
-})
+end
 
-task.spawn(function()
-	while true do
-		if autoDowngradeEnabled then
-			CardRemote:FireServer("Downgrade", "Pirate", "Gold")
-			task.wait() -- minimal yield, fastest safe speed
-		else
-			task.wait(0.1)
-		end
-	end
-end)
-
---========================================================
--- AUTO DOWNGRADE (SOUL GOLD)
---========================================================
-local autoDowngradeSoulGold = false
-
-AutoFarmPotionsTab:CreateToggle({
-	Name = "Auto Downgrade Soul Gold",
-	CurrentValue = false,
-	Flag = "AutoDowngradeSoulGold",
-	Callback = function(v)
-		autoDowngradeSoulGold = v
-	end
-})
-
-task.spawn(function()
-	while true do
-		if autoDowngradeSoulGold then
-			CardRemote:FireServer("Downgrade", "Soul", "Gold")
-			task.wait()
-		else
-			task.wait(0.1)
-		end
-	end
-end)
-
---========================================================
--- AUTO DOWNGRADE (NINJA GOLD)
---========================================================
-local autoDowngradeNinjaGold = false
-
-AutoFarmPotionsTab:CreateToggle({
-	Name = "Auto Downgrade Ninja Gold",
-	CurrentValue = false,
-	Flag = "AutoDowngradeNinjaGold",
-	Callback = function(v)
-		autoDowngradeNinjaGold = v
-	end
-})
-
-task.spawn(function()
-	while true do
-		if autoDowngradeNinjaGold then
-			CardRemote:FireServer("Downgrade", "Ninja", "Gold")
-			task.wait()
-		else
-			task.wait(0.1)
-		end
-	end
-end)
 
 --========================================================
 -- AUTO CRAFT HATCH TIME (2 MIN)
@@ -1653,3 +2041,4 @@ task.spawn(function()
 		end
 	end
 end)
+
