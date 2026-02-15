@@ -300,7 +300,7 @@ local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card"
 --========================================================
 -- STATE VARIABLES
 --========================================================
-local autoFarmPacksEnabled = true
+local autoFarmPacksEnabled = false
 local selectedPacks = {}
 local mutationFilters = {
     Gold = false,
@@ -342,7 +342,7 @@ end)
 --========================================================
 AutoFarmTab:CreateToggle({
     Name = "Auto Farm Packs",
-    CurrentValue = true,
+    CurrentValue = false,
     Flag = "AutoFarmPacks",
     Callback = function(v)
         autoFarmPacksEnabled = v
@@ -365,7 +365,7 @@ if packsFolder then
 
             AutoFarmTab:CreateToggle({
                 Name = pack.Name,
-                CurrentValue = true,
+                CurrentValue = false,
                 Flag = "Pack_" .. pack.Name,
                 Callback = function(v)
                     selectedPacks[pack.Name] = v
