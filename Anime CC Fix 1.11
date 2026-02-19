@@ -578,7 +578,7 @@ local CategoryOrder = {
 	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
 	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
 	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
-	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre"
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Fairy", "Sins"
 }
 
 -- Auto Grade toggle
@@ -695,7 +695,7 @@ local TraitCategoryOrder = {
 	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
 	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
 	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
-	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre"
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Fairy", "Sins"
 }
 
 --========================================================
