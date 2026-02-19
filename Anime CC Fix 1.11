@@ -569,7 +569,7 @@ local CharacterCategories = {
 	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazaku", "VV"},
 	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jotaro"},
 	["Fairy"] = {"Nastu", "Grey", "Lucy", "Juvia", "Gajeel", "Wendy", "Erza", "Lazarus", "Zeref"},
-	[Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
+	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
 }
 
 
@@ -687,7 +687,7 @@ local TraitCategories = {
 	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazuka", "VV"},
 	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jotaro"},
 	["Fairy"] = {"Nastu", "Grey", "Lucy", "Juvia", "Gajeel", "Wendy", "Erza", "Lazarus", "Zeref"},
-	[Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
+	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
 }
 
 -- Explicit display order
