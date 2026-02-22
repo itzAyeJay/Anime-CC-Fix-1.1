@@ -245,6 +245,154 @@ task.spawn(function()
 end)
 
 --========================================================
+-- AUTO COLLECT CASH (PLOT PAGE CYCLER)
+--========================================================
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// References
+local LocalPlayer = Players.LocalPlayer
+local CardRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Card")
+
+--// State
+local autoCollectEnabled = false
+
+--========================================================
+-- GET LOCAL PLAYER PLOT (DISPLAY NAME BASED - ROBUST)
+--========================================================
+local function getPlayerPlot()
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then
+        warn("[PlotDetect] workspace.Plots not found")
+        return nil
+    end
+
+    local displayName = string.lower(LocalPlayer.DisplayName)
+
+    for i = 1, 6 do
+        local plot = plotsFolder:FindFirstChild(tostring(i))
+        if plot then
+            local display =
+                plot:FindFirstChild("Map")
+                and plot.Map:FindFirstChild("Display")
+                and plot.Map.Display:FindFirstChild("Top")
+                and plot.Map.Display.Top:FindFirstChild("Gui")
+                and plot.Map.Display.Top.Gui:FindFirstChild("Display")
+                and plot.Map.Display.Top.Gui.Display:FindFirstChild("Display")
+
+            if display and typeof(display.Text) == "string" then
+                local text = string.lower(display.Text)
+
+                if string.find(text, displayName, 1, true) then
+                    print("[PlotDetect] Found player plot:", i)
+                    return plot
+                end
+            end
+        end
+    end
+
+    warn("[PlotDetect] No plot found for player:", LocalPlayer.DisplayName)
+    return nil
+end
+
+--========================================================
+-- COLLECT ALL CARDS FROM SIDE (LEFT OR RIGHT)
+--========================================================
+local function collectSide(sideModel)
+    if not sideModel then return end
+
+    for i = 1, 9 do
+        if not autoCollectEnabled then return end
+
+        local part = sideModel:FindFirstChild(tostring(i))
+        if part and part:IsA("BasePart") then
+            CardRemote:FireServer("Collect", part)
+            task.wait(0.05)
+        end
+    end
+end
+
+--========================================================
+-- COLLECT CURRENT PAGE (LEFT + RIGHT)
+--========================================================
+local function collectCurrentPage(plot)
+    if not plot then return end
+
+    local map = plot:FindFirstChild("Map")
+    if not map then return end
+
+    local display = map:FindFirstChild("Display")
+    if not display then return end
+
+    local leftModel = display:FindFirstChild("Left")
+    local rightModel = display:FindFirstChild("Right")
+
+    collectSide(leftModel)
+    collectSide(rightModel)
+end
+
+--========================================================
+-- PAGE CONTROLS
+--========================================================
+local function pageRight()
+    CardRemote:FireServer("Page", "RightArrow")
+end
+
+local function pageLeft()
+    CardRemote:FireServer("Page", "LeftArrow")
+end
+
+--========================================================
+-- MAIN LOOP
+--========================================================
+task.spawn(function()
+    while task.wait(0.25) do
+        if not autoCollectEnabled then continue end
+
+        local plot = getPlayerPlot()
+        if not plot then
+            task.wait(1)
+            continue
+        end
+
+        -- Start by going right 9 times
+        for i = 1, 9 do
+            if not autoCollectEnabled then break end
+
+            collectCurrentPage(plot)
+            task.wait(0.1)
+            pageRight()
+            task.wait(0.15)
+        end
+
+        -- Now go back left 8 times
+        for i = 1, 8 do
+            if not autoCollectEnabled then break end
+
+            collectCurrentPage(plot)
+            task.wait(0.1)
+            pageLeft()
+            task.wait(0.15)
+        end
+    end
+end)
+
+--========================================================
+-- TOGGLE (GAME TAB)
+--========================================================
+GameTab:CreateToggle({
+	Name = "Auto Collect Cash",
+	CurrentValue = false,
+	Flag = "AutoCollectCash",
+	Callback = function(Value)
+		autoCollectEnabled = Value
+	end
+})
+
+
+--========================================================
 -- TRAVELING MERCHANT
 --========================================================
 local merchantTPEnabled = false
@@ -569,7 +717,9 @@ local CharacterCategories = {
 	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazaku", "VV"},
 	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jotaro"},
 	["Fairy"] = {"Nastu", "Grey", "Lucy", "Juvia", "Gajeel", "Wendy", "Erza", "Lazarus", "Zeref"},
-	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
+	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"},
+    ["Note"] = {"Light", "Soichiro", "Naomi", "Mello", "Near", "Misa", "Rem", "Ryuk", "L"},
+    ["Slime"] = {"Shuna", "Souei", "Shion", "Benimaru Tempest", "Diablo", "Veldora", "Milim", "Guy Crimson"}
 }
 
 
@@ -578,7 +728,7 @@ local CategoryOrder = {
 	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
 	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
 	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
-	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Fairy", "Sins"
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Note", "Slime"
 }
 
 -- Auto Grade toggle
@@ -687,7 +837,9 @@ local TraitCategories = {
 	["Geass"] = {"Lelouch", "CC", "Rolo", "Euphenmia", "Sakuya", "Jeremiah", "Kallen", "Sazuka", "VV"},
 	["Bizarre"] = {"Koichi", "Muhammad", "Jean", "Bruno", "Josuke", "Kira", "Giorno", "Dio", "Jotaro"},
 	["Fairy"] = {"Nastu", "Grey", "Lucy", "Juvia", "Gajeel", "Wendy", "Erza", "Lazarus", "Zeref"},
-	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"}
+	["Sins"] = {"Meliodas", "Elizabeth", "Gunther", "Diane", "Fairy King", "Ban", "Merlin", "Zeldris", "Escanor"},
+    ["Note"] = {"Light", "Soichiro", "Naomi", "Mello", "Near", "Misa", "Rem", "Ryuk", "L"},
+    ["Slime"] = {"Shuna", "Souei", "Shion", "Benimaru Tempest", "Diablo", "Veldora", "Milim", "Guy Crimson"}
 }
 
 -- Explicit display order
@@ -695,7 +847,7 @@ local TraitCategoryOrder = {
 	"One Piece","Naruto","Bleach","Demon Slayer","Jujutsu Kaisen",
 	"Dragon Ball","Fire Force","One Punch Man","Hunter x Hunter",
 	"Solo Leveling","Attack on Titan","Chainsaw Man","Haikyuu",
-	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Fairy", "Sins"
+	"Blue Lock","Black Clover","Tokyo Ghoul", "Geass", "Bizarre", "Note", "Slime"
 }
 
 --========================================================
